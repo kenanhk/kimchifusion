@@ -34,6 +34,11 @@ const resources = {
       improvements: 'What can we improve for your next visit?',
       additionalComments: 'Additional Comments or Suggestions',
       submit: 'Submit Feedback',
+      adminLogin: 'Admin Login',
+      password: 'Password',
+      signIn: 'Sign in',
+      signingIn: 'Signing in...',
+      admin: 'Admin',
       // Add more translations as needed
     }
   },
@@ -68,6 +73,11 @@ const resources = {
       improvements: '您希望我們在哪些方面改進？',
       additionalComments: '其他意見或建議',
       submit: '提交意見',
+      adminLogin: '管理員登入',
+      password: '密碼',
+      signIn: '登入',
+      signingIn: '登入中...',
+      admin: '管理員',
       // Add more translations as needed
     }
   },
@@ -102,6 +112,11 @@ const resources = {
       improvements: '您希望我們在哪些方面改進？',
       additionalComments: '其他意見或建議',
       submit: '提交意見',
+      adminLogin: '管理員登入',
+      password: '密碼',
+      signIn: '登入',
+      signingIn: '登入中...',
+      admin: '管理員',
       // Add more translations as needed
     }
   }

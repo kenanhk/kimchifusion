@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import ReviewPage from './pages/ReviewPage';
 import FeedbackPage from './pages/FeedbackPage';
 import AdminPage from './pages/AdminPage';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
   return (
@@ -16,7 +18,15 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/feedback" element={<FeedbackPage />} />
-            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminPage />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </main>
       </div>
