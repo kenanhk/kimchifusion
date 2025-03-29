@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LanguageSelector = () => {
@@ -12,30 +11,30 @@ const LanguageSelector = () => {
     <div className="flex space-x-2">
       <button
         onClick={() => changeLanguage('en')}
-        className={`px-2 py-1 rounded text-sm ${
+        className={`px-2 py-1 rounded ${
           i18n.language === 'en'
-            ? 'bg-gray-800 text-white'
-            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
       >
         EN
       </button>
       <button
         onClick={() => changeLanguage('zh')}
-        className={`px-2 py-1 rounded text-sm ${
+        className={`px-2 py-1 rounded ${
           i18n.language === 'zh'
-            ? 'bg-gray-800 text-white'
-            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
       >
         简体
       </button>
       <button
         onClick={() => changeLanguage('zh-TW')}
-        className={`px-2 py-1 rounded text-sm ${
+        className={`px-2 py-1 rounded ${
           i18n.language === 'zh-TW'
-            ? 'bg-gray-800 text-white'
-            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
       >
         繁體
