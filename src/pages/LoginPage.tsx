@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import supabase from '../supabaseClient';
+
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxAttempts: 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+};
 
 const LoginPage = () => {
   const { t } = useTranslation();
@@ -12,21 +18,82 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Rate limiting state
+  const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+
+  // Load rate limiting data from localStorage
+  useEffect(() => {
+    const storedData = localStorage.getItem('loginRateLimit');
+    if (storedData) {
+      const { attempts, lockout } = JSON.parse(storedData);
+      setLoginAttempts(attempts);
+      setLockoutUntil(lockout);
+    }
+  }, []);
+
+  // Update localStorage when rate limiting data changes
+  useEffect(() => {
+    if (loginAttempts > 0 || lockoutUntil) {
+      localStorage.setItem('loginRateLimit', JSON.stringify({
+        attempts: loginAttempts,
+        lockout: lockoutUntil,
+      }));
+    }
+  }, [loginAttempts, lockoutUntil]);
+
+  // Check and reset rate limiting
+  useEffect(() => {
+    if (lockoutUntil && Date.now() > lockoutUntil) {
+      setLoginAttempts(0);
+      setLockoutUntil(null);
+      localStorage.removeItem('loginRateLimit');
+    }
+  }, [lockoutUntil]);
+
   // Get the redirect path from location state or default to /admin
   const from = (location.state as any)?.from?.pathname || '/admin';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check rate limiting
+    if (lockoutUntil) {
+      if (Date.now() < lockoutUntil) {
+        const minutesLeft = Math.ceil((lockoutUntil - Date.now()) / (60 * 1000));
+        setError(`Too many login attempts. Please try again in ${minutesLeft} minutes.`);
+        return;
+      } else {
+        setLoginAttempts(0);
+        setLockoutUntil(null);
+      }
+    }
+
+    if (loginAttempts >= RATE_LIMIT.maxAttempts) {
+      const lockoutTime = Date.now() + RATE_LIMIT.windowMs;
+      setLockoutUntil(lockoutTime);
+      setError(`Too many login attempts. Please try again in 15 minutes.`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        setLoginAttempts(prev => prev + 1);
+        throw error;
+      }
+
+      // Reset rate limiting on successful login
+      setLoginAttempts(0);
+      setLockoutUntil(null);
+      localStorage.removeItem('loginRateLimit');
 
       // Navigate to the attempted page or admin
       navigate(from, { replace: true });
@@ -65,6 +132,7 @@ const LoginPage = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder={t('email', 'Email')}
+                autoComplete="email"
               />
             </div>
             <div>
@@ -80,6 +148,7 @@ const LoginPage = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder={t('password', 'Password')}
+                autoComplete="current-password"
               />
             </div>
           </div>
@@ -87,8 +156,8 @@ const LoginPage = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={loading || (!!lockoutUntil && Date.now() < lockoutUntil)}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? t('signingIn', 'Signing in...') : t('signIn', 'Sign in')}
             </button>

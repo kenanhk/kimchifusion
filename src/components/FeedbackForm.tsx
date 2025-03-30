@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import StarRating from './StarRating';
-import supabase from '../supabaseClient';
+import supabase, { testSupabaseConnection } from '../utils/supabaseClient';
+import { sanitizeInput, isValidEmail, isValidPhone, checkRateLimit, getRateLimitResetTime } from '../utils/security';
+import { handleError, safeLogError } from '../utils/errorHandler';
+import { PostgrestError } from '@supabase/supabase-js';
 
 interface FeedbackFormData {
   name: string;
@@ -20,6 +23,8 @@ const FeedbackForm = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [formData, setFormData] = useState<FeedbackFormData>({
     name: '',
     phone: '',
@@ -32,51 +37,127 @@ const FeedbackForm = () => {
     additionalComments: '',
   });
 
+  useEffect(() => {
+    const checkConnection = async () => {
+      const connected = await testSupabaseConnection();
+      setIsConnected(connected);
+      if (!connected) {
+        setError('Unable to connect to the server. Please try again later.');
+      }
+    };
+    checkConnection();
+  }, []);
+
+  const validateForm = (): boolean => {
+    // Reset error
+    setError(null);
+
+    // Check rate limit
+    if (!checkRateLimit()) {
+      const resetTime = Math.ceil(getRateLimitResetTime() / (60 * 1000)); // Convert to minutes
+      setError(`Too many submissions. Please try again in ${resetTime} minutes.`);
+      return false;
+    }
+
+    // Validate required fields
+    if (!formData.name.trim() || !formData.email.trim()) {
+      setError('Name and email are required.');
+      return false;
+    }
+
+    // Validate field lengths
+    if (formData.name.length > 100) {
+      setError('Name must be less than 100 characters.');
+      return false;
+    }
+    if (formData.email.length > 100) {
+      setError('Email must be less than 100 characters.');
+      return false;
+    }
+    if (formData.phone && formData.phone.length > 20) {
+      setError('Phone number must be less than 20 characters.');
+      return false;
+    }
+    if (formData.enjoyedMost.length > 500) {
+      setError('Enjoyed most field must be less than 500 characters.');
+      return false;
+    }
+    if (formData.improvements.length > 500) {
+      setError('Improvements field must be less than 500 characters.');
+      return false;
+    }
+    if (formData.additionalComments.length > 1000) {
+      setError('Additional comments must be less than 1000 characters.');
+      return false;
+    }
+
+    // Validate email format
+    if (!isValidEmail(formData.email.trim())) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+
+    // Validate phone if provided
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      setError('Please enter a valid phone number.');
+      return false;
+    }
+
+    // Validate rating values
+    if (formData.overallRating < 0 || formData.overallRating > 5) {
+      setError('Overall rating must be between 0 and 5.');
+      return false;
+    }
+    if (formData.foodQuality < 0 || formData.foodQuality > 5) {
+      setError('Food quality rating must be between 0 and 5.');
+      return false;
+    }
+    if (formData.serviceQuality < 0 || formData.serviceQuality > 5) {
+      setError('Service quality rating must be between 0 and 5.');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Only validate name and email
-    if (!formData.name.trim() || !formData.email.trim()) {
+    
+    if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
     try {
-      console.log('Submitting feedback data:', {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        overall_rating: formData.overallRating,
-        enjoyed_most: formData.enjoyedMost,
-        food_quality: formData.foodQuality,
-        service_quality: formData.serviceQuality,
-        improvements: formData.improvements,
-        additional_comments: formData.additionalComments,
+      // Sanitize all text inputs
+      const sanitizedData = {
+        name: sanitizeInput(formData.name),
+        email: formData.email.trim().toLowerCase(),
+        phone: sanitizeInput(formData.phone),
+        overall_rating: Math.min(Math.max(formData.overallRating, 0), 5), // Ensure rating is between 0-5
+        enjoyed_most: sanitizeInput(formData.enjoyedMost),
+        food_quality: Math.min(Math.max(formData.foodQuality, 0), 5), // Ensure rating is between 0-5
+        service_quality: Math.min(Math.max(formData.serviceQuality, 0), 5), // Ensure rating is between 0-5
+        improvements: sanitizeInput(formData.improvements),
+        additional_comments: sanitizeInput(formData.additionalComments)
+      };
+
+      console.log('Attempting to submit feedback:', {
+        ...sanitizedData,
+        phone: sanitizedData.phone || 'not provided'
       });
 
-      const { data, error } = await supabase
+      const { error: supabaseError } = await supabase
         .from('feedbacks')
-        .insert([
-          {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            overall_rating: formData.overallRating,
-            enjoyed_most: formData.enjoyedMost,
-            food_quality: formData.foodQuality,
-            service_quality: formData.serviceQuality,
-            improvements: formData.improvements,
-            additional_comments: formData.additionalComments,
-          }
-        ])
-        .select('*');
+        .insert([sanitizedData]) as { error: PostgrestError | null };
 
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
+      if (supabaseError) {
+        console.error('Supabase error:', supabaseError);
+        throw supabaseError;
       }
 
-      console.log('Successfully inserted feedback:', data);
-      
+      console.log('Feedback submitted successfully');
+
       // Show success message
       alert('Thank you for your feedback!');
       
@@ -96,8 +177,12 @@ const FeedbackForm = () => {
       // Navigate back to home page
       navigate('/');
     } catch (error) {
-      console.error('Error submitting feedback:', error);
-      alert('There was an error submitting your feedback. Please try again.');
+      console.error('Submission error:', error);
+      const { userMessage, shouldLog } = handleError(error);
+      if (shouldLog) {
+        safeLogError(error, 'Feedback submission error');
+      }
+      setError(userMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,6 +208,18 @@ const FeedbackForm = () => {
         </p>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {isConnected === false && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <p className="text-yellow-700">Connection issues detected. Please check your internet connection and try again.</p>
+        </div>
+      )}
+
       {/* Personal Information Section */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -143,6 +240,7 @@ const FeedbackForm = () => {
               required
               aria-required="true"
               aria-label={t('name')}
+              maxLength={100}
             />
           </div>
           <div>
@@ -157,6 +255,7 @@ const FeedbackForm = () => {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               aria-label={t('phoneNumber')}
+              maxLength={20}
             />
           </div>
           <div className="md:col-span-2">
@@ -173,6 +272,7 @@ const FeedbackForm = () => {
               required
               aria-required="true"
               aria-label={t('email')}
+              maxLength={100}
             />
           </div>
         </div>
@@ -210,6 +310,7 @@ const FeedbackForm = () => {
             rows={3}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label={t('enjoyedMost')}
+            maxLength={500}
           />
         </div>
 
@@ -252,6 +353,7 @@ const FeedbackForm = () => {
             rows={3}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label={t('improvements')}
+            maxLength={500}
           />
         </div>
 
@@ -268,6 +370,7 @@ const FeedbackForm = () => {
             rows={4}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label={t('additionalComments')}
+            maxLength={1000}
           />
         </div>
       </div>

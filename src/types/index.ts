@@ -4,4 +4,6 @@ export interface Review {
   comment: string;
   platform: 'internal' | 'google' | 'openrice';
   createdAt: string;
-} 
+}
+
+export * from './supabase'; 

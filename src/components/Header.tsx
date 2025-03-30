@@ -19,18 +19,7 @@ const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
-            <div className="flex space-x-4">
-              <Link to="/review" className="text-gray-600 hover:text-gray-900">
-                {t('review')}
-              </Link>
-              <Link to="/feedback" className="text-gray-600 hover:text-gray-900">
-                {t('feedback')}
-              </Link>
-              <Link to="/admin" className="text-gray-600 hover:text-gray-900">
-                {t('admin', 'Admin')}
-              </Link>
-            </div>
+          <div className="hidden md:flex md:items-center">
             <div className="flex items-center space-x-4">
               <LanguageSelector />
               <HalalLogo />
@@ -57,29 +46,6 @@ const Header = () => {
 
         {/* Mobile menu */}
         <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              to="/review"
-              className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              {t('review')}
-            </Link>
-            <Link
-              to="/feedback"
-              className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              {t('feedback')}
-            </Link>
-            <Link
-              to="/admin"
-              className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              {t('admin', 'Admin')}
-            </Link>
-          </div>
           <div className="pt-4 pb-3 border-t border-gray-200">
             <div className="flex items-center px-3 space-x-4">
               <LanguageSelector />
